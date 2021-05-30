@@ -1,22 +1,23 @@
 const RpiGpioRts = require('./RpiGpioRts');
+
 let Service, Characteristic;
 
 module.exports = homebridge => {
 	Service = homebridge.hap.Service;
 	Characteristic = homebridge.hap.Characteristic;
-	homebridge.registerAccessory('homebridge-rpi-rts', 'Somfy RTS Remote', SomfyRtsRemoteAccessory);
+	homebridge.registerAccessory('homebridge-rpi-somfy-roller-shutter', 'Somfy RTS Roller Shutter', SomfyRtsRollerShutterAccessory);
 };
 
 /**
  * Class simulating a Somfy RTS Remote Accessory for Homebridge
  * with 4 'stateless' switches: Up, Down, My, Prog
  *
- * @class SomfyRtsRemoteAccessory
+ * @class SomfyRtsRollerShutterAccessory
  */
-class SomfyRtsRemoteAccessory {
+class SomfyRtsRollerShutterAccessory {
 
 	/**
-	 * Constructor of the class SomfyRtsRemoteAccessory
+	 * Constructor of the class SomfyRtsRollerShutterAccessory
 	 *
 	 * @constructor
 	 * @param {Object} log - The Homebridge log
