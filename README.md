@@ -1,5 +1,12 @@
-# Homebridge-RPi-RTS
-A [Homebridge](https://github.com/homebridge/homebridge) plugin to add HomeKit compatibility to Somfy RTS devices (rolling shutters, blinds, awnings, ...) requiring only a [Raspberry Pi](https://www.raspberrypi.org) and a simple 433 MHz transmitter.
+# homebridge-rpi-somfy-roller-shutter
+A [Homebridge](https://github.com/homebridge/homebridge) plugin to add HomeKit compatibility to Somfy RTS rolling shutters requiring only a [Raspberry Pi](https://www.raspberrypi.org) and a simple 433 MHz transmitter.
+
+# Fork changes
+
+Instead of the origin version of the package homebridge-rpi-rts, this package handle a rolling shutters as a WindowCovering so it has only one button for each shutter instead of 3 (Up, Down, My).
+
+!!! Be warned that the state will not be good if you mix the command from home kit and with the Somfy remote as explained [here](https://github.com/wibberryd/homebridge-rpi-rts/issues/7#issuecomment-766090063).
+
 
 | Advantages | Limitations |
 | ---------- | ----------- |
