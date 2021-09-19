@@ -21,6 +21,33 @@
 				"minimum": 0,
 				"maximum": 16777216
 			},
+			"shuttingDownDuration": {
+				"title": "Shutting Down Duration",
+				"description": "Time in millisecond to go for the shutter to go from top to bottom (just touch the bottom of the window)",
+				"type": "integer",
+				"default": 14000,
+				"required": true,
+				"minimum": 1000,
+				"maximum": 120000
+			},
+			"shuttingUpDuration": {
+				"title": "Shutting Up Duration",
+				"description": "Time in millisecond to go for the shutter to go from bottom (just touch the bottom of the window) to top",
+				"type": "integer",
+				"default": 17000,
+				"required": true,
+				"minimum": 1000,
+				"maximum": 120000
+			},
+			"shuttingLockingDuration": {
+				"title": "Shutting Locking Duration",
+				"description": "Time in millisecond to go for the shutter to go from bottom to completely down",
+				"type": "integer",
+				"default": 3000,
+				"required": true,
+				"minimum": 1,
+				"maximum": 10000
+			},
 			"prog": {
 				"title": "Show Prog Button",
 				"description": "Disable after the pairing phase to hide the Prog button",

@@ -1,4 +1,6 @@
-// const RpiGpioRts = require('./RpiGpioRts');
+const RpiGpioRts = require('./RpiGpioRts');
+
+// TODO: gérer le cas où on referme/reouvre completement apres une fermeture ouverture (dans le cas ou ca a mal fermé un volet)
 
 let Service, Characteristic;
 
@@ -25,58 +27,63 @@ class SomfyRtsRollerShutterAccessory {
 	*/
 	constructor(log, config) {
 		this.log = log;
-		if (!config || !config.name || !config.id) {
+		if (!config || !config.name || !config.id || !config.shuttingDownDuration || !config.shuttingUpDuration || !config.shuttingLockingDuration) {
 			throw new Error(`Invalid or missing configuration.`);
 		}
 		this.config = config;
-		// this.emitter = new RpiGpioRts(log, config);
-		
-		// Delay to reset the switch after being pressed
-		this.delay = 500;
-		
-		// this.buttons = ['Up', 'Down', 'My'];
-		// if (this.config.prog === true) this.buttons.push('Prog');
+		this.emitter = new RpiGpioRts(log, config);
 
-		this.currentPosition = 100;
+		// TODO mettre ces variables dans la config
+		this.shuttingDownDuration = 14000;	// how long to open to close completely
+		this.shuttingUpDuration = 17000;	// how long to close to open completely
+		this.shuttingLockingDuration = 3000;	// how long to be from shutter touch the bottom to completely locked (ca passe de semi transparent a completement opaque)
+		this.currentPosition = 100; // TODO need to be saved
 		this.positionState = Characteristic.PositionState.STOPPED;
-		this.targetPosition = 100;
+		this.targetPosition = 100; // 100 = open  0 = close
+
+		const interval = 100;
 
 		setInterval(() => {
 			if (this.currentPosition > this.targetPosition) {
-				this.log.info(`setInterval dec ${this.currentPosition} ${this.targetPosition} `);
-				this.currentPosition--;
-				this.positionState = Characteristic.PositionState.DECREASING;
-
+				this.log.info(`setInterval dec ${this.currentPosition} ${this.targetPosition}`);
+				if (this.currentPosition <= 1) this.currentPosition = Math.max(this.currentPosition - (interval / this.shuttingLockingDuration), this.targetPosition);
+				else this.currentPosition = Math.max(this.currentPosition - (interval * 100 / config.shuttingDownDuration), this.targetPosition);
 				this.windowCoveringService.getCharacteristic(Characteristic.CurrentPosition).updateValue(this.currentPosition);
-				this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(this.currentPosition === this.targetPosition ? Characteristic.PositionState.STOPPED: Characteristic.PositionState.DECREASING);
+
+				if (this.currentPosition === this.targetPosition) {
+					this.log.info(`setInterval dec stop ${this.currentPosition} ${this.targetPosition}`);
+					this.currentPosition = this.targetPosition;
+					this.positionState = Characteristic.PositionState.STOPPED;
+					this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.STOPPED);
+					if (this.currentPosition !== 0 && this.currentPosition !== 100) {
+						// don't stop if the shutter go full up or down to be sure it's completely open or close, the shutter will auto stop
+						this.log.info('XXXXXXXXXX impulse STOP');
+						this.emitter.sendCommand('My');
+					}
+					// XXX stop interval
+				}
+
 			} else if (this.currentPosition < this.targetPosition) {
-				this.log.info(`setInterval inc ${this.currentPosition} ${this.targetPosition} `);
-				this.currentPosition++;
-				this.positionState = Characteristic.PositionState.INCREASING;
-
+				this.log.info(`setInterval inc ${this.currentPosition} ${this.targetPosition}`);
+				if (this.currentPosition <= 1) this.currentPosition = Math.min(this.currentPosition + (interval / this.shuttingLockingDuration), this.targetPosition);
+				else this.currentPosition = Math.min(this.currentPosition + (interval * 100 / this.shuttingUpDuration), this.targetPosition);
 				this.windowCoveringService.getCharacteristic(Characteristic.CurrentPosition).updateValue(this.currentPosition);
-				if (this.currentPosition === this.targetPosition) this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.STOPPED);
-				this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(this.currentPosition === this.targetPosition ? Characteristic.PositionState.STOPPED: Characteristic.PositionState.INCREASING);
-			}
-		}, 100);
 
-		// // Create an object such as {'Up': false, 'Down': false, ...}
-		// this.states = this.buttons.reduce((acc, cur) => {
-		// 	acc[cur] = false;
-		// 	return acc;
-		// }, {});
-		
-		// this.switchServices = {};
-		
-		// this.buttons.forEach(button => {
-		
-		// 	this.switchServices[button] = new Service.Switch(`${this.config.name} ${button}`, button);
-			
-		// 	this.switchServices[button]
-		// 		.getCharacteristic(Characteristic.On)
-		// 		.on('get', this.getOn.bind(this, button))
-		// 		.on('set', this.setOn.bind(this, button));
-		// });
+				if (this.currentPosition === this.targetPosition) {
+					this.log.info(`setInterval inc stop ${this.currentPosition} ${this.targetPosition}`);
+					this.currentPosition = this.targetPosition;
+					this.positionState = Characteristic.PositionState.STOPPED;
+					this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.STOPPED);
+					if (this.currentPosition !== 0 && this.currentPosition !== 100) {
+						// don't stop if the shutter go full up or down to be sure it's completely open or close, the shutter will auto stop
+						this.log.info('XXXXXXXXXX impulse STOP');
+						this.emitter.sendCommand('My');
+					}
+					// XXX stop interval
+				}
+
+			}
+		}, interval);
 		
 		this.windowCoveringService = new Service.WindowCovering(this.config.name);
 
@@ -87,7 +94,6 @@ class SomfyRtsRollerShutterAccessory {
 		this.windowCoveringService
 			.getCharacteristic(Characteristic.PositionState)
 			.on('get', this.getPositionState.bind(this));
-
 
 		this.windowCoveringService
 			.getCharacteristic(Characteristic.TargetPosition)
@@ -141,27 +147,53 @@ class SomfyRtsRollerShutterAccessory {
 	setTargetPosition(value, callback) {
 		this.log.info(`Function setTargetPosition called with value ${value}`);
 		this.targetPosition = value;
-		// if (value === true) {
-		// 	this.emitter.sendCommand(button);
-		// 	this.resetSwitchWithTimeout(button);
-		// }
+
+		if (this.positionState === Characteristic.PositionState.STOPPED) {
+			if (this.currentPosition > this.targetPosition) {
+				// need to start a dec on the shutter
+				this.log.info(`Function setTargetPosition start dec ${this.currentPosition} ${this.targetPosition}`);
+				this.positionState = Characteristic.PositionState.DECREASING;
+				this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.DECREASING);
+				this.log.info('XXXXXXXXXX impulse DOWN');
+				this.emitter.sendCommand('Down');
+				// XXX start interval
+			} else if (this.currentPosition < this.targetPosition) {
+				// need to start a inc on the shutter
+				this.log.info(`Function setTargetPosition start inc ${this.currentPosition} ${this.targetPosition}`);
+				this.positionState = Characteristic.PositionState.INCREASING;
+				this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.INCREASING);
+				this.log.info('XXXXXXXXXX impulse UP');
+				this.emitter.sendCommand('Up');
+				// XXX start interval
+			}
+		} else if (this.positionState === Characteristic.PositionState.DECREASING) {
+			if (this.currentPosition > this.targetPosition) {
+				// need to continue a dec on the shutter
+				this.log.info(`Function setTargetPosition continue dec ${this.currentPosition} ${this.targetPosition}`);
+			} else if (this.currentPosition < this.targetPosition) {
+				// need to start a inc on the shutter
+				this.log.info(`Function setTargetPosition switch start inc ${this.currentPosition} ${this.targetPosition}`);
+				this.positionState = Characteristic.PositionState.INCREASING;
+				this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.INCREASING);
+				this.log.info('XXXXXXXXXX impulse UP');
+				this.emitter.sendCommand('Up');
+			}
+		} else if (this.positionState === Characteristic.PositionState.INCREASING) {
+			if (this.currentPosition > this.targetPosition) {
+				// need to start a inc on the shutter
+				this.log.info(`Function setTargetPosition switch start dec ${this.currentPosition} ${this.targetPosition}`);
+				this.positionState = Characteristic.PositionState.DECREASING;
+				this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.DECREASING);
+				this.log.info('XXXXXXXXXX impulse DOWN');
+				this.emitter.sendCommand('Down');
+			} else if (this.currentPosition < this.targetPosition) {
+				// need to continue a inc on the shutter
+				this.log.info(`Function setTargetPosition continue inc ${this.currentPosition} ${this.targetPosition}`);
+			}
+		}
+
 		callback(null);
 	}
-
-
-
-	/**
-	 * Reset the switch to false to simulate a stateless behavior
-	 *
-	 * @method resetSwitchWithTimeout
-	 * @param {String} button - 'Up', 'Down', 'My', 'Prog'
-	*/
-	// resetSwitchWithTimeout(button) {
-	// 	this.log.info(`Function resetSwitchWithTimeout called for button ${button}`);
-	// 	setTimeout(function() {
-	// 		this.switchServices[button].setCharacteristic(Characteristic.On, false);
-	// 	}.bind(this), this.delay);
-	// }
 	
 	/**
 	 * Mandatory method for Homebridge
