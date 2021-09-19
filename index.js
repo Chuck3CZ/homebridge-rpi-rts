@@ -1,10 +1,10 @@
 const fs = require('fs');
 const RpiGpioRts = require('./RpiGpioRts');
 
-// TODO: gérer le cas où on referme/reouvre completement apres une fermeture ouverture (dans le cas ou ca a mal fermé un volet)
-
 let Service;
 let Characteristic;
+
+// XXX prog button
 
 /**
  * Class simulating a Somfy RTS Remote Accessory for Homebridge
@@ -33,42 +33,43 @@ class SomfyRtsRollerShutterAccessory {
     const interval = 100;
 
     setInterval(() => {
+      if (this.currentPosition === this.targetPosition) return;
+
+      // compute the new currentPosition depending of the direction
       if (this.currentPosition > this.targetPosition) {
-        this.log.info(`setInterval dec ${this.currentPosition} ${this.targetPosition}`);
-        if (this.currentPosition <= 1) this.currentPosition = Math.max(this.currentPosition - (interval / config.shuttingLockingDuration), this.targetPosition);
-        else this.currentPosition = Math.max(this.currentPosition - (interval * 100 / config.shuttingDownDuration), this.targetPosition);
-        this.windowCoveringService.getCharacteristic(Characteristic.CurrentPosition).updateValue(this.currentPosition);
+        this.log.debug(`setInterval dec ${this.currentPosition} ${this.targetPosition}`);
 
-        if (this.currentPosition === this.targetPosition) {
-          this.log.info(`setInterval dec stop ${this.currentPosition} ${this.targetPosition}`);
-          this.currentPosition = this.targetPosition;
-          this.positionState = Characteristic.PositionState.STOPPED;
-          this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.STOPPED);
-          if (this.currentPosition !== 0 && this.currentPosition !== 100) {
-            // don't stop if the shutter go full up or down to be sure it's completely open or close, the shutter will auto stop
-            this.emitter.sendCommand('My');
-          }
-          // XXX stop interval
-        }
+        this.currentPosition -= this.currentPosition <= 1 ? interval * 1 / config.shuttingLockingDuration : interval * 100 / config.shuttingDownDuration;
+        this.currentPosition = Math.max(this.currentPosition, this.targetPosition);
       } else if (this.currentPosition < this.targetPosition) {
-        this.log.info(`setInterval inc ${this.currentPosition} ${this.targetPosition}`);
-        if (this.currentPosition <= 1) this.currentPosition = Math.min(this.currentPosition + (interval / config.shuttingLockingDuration), this.targetPosition);
-        else this.currentPosition = Math.min(this.currentPosition + (interval * 100 / config.shuttingUpDuration), this.targetPosition);
-        this.windowCoveringService.getCharacteristic(Characteristic.CurrentPosition).updateValue(this.currentPosition);
+        this.log.debug(`setInterval inc ${this.currentPosition} ${this.targetPosition}`);
 
-        if (this.currentPosition === this.targetPosition) {
-          this.log.info(`setInterval inc stop ${this.currentPosition} ${this.targetPosition}`);
-          this.currentPosition = this.targetPosition;
-          this.positionState = Characteristic.PositionState.STOPPED;
-          this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.STOPPED);
-          if (this.currentPosition !== 0 && this.currentPosition !== 100) {
-            // don't stop if the shutter go full up or down to be sure it's completely open or close, the shutter will auto stop
-            this.emitter.sendCommand('My');
-          }
-          // XXX stop interval
+        this.currentPosition += this.currentPosition <= 1 ? interval * 1 / config.shuttingLockingDuration : interval * 100 / config.shuttingUpDuration;
+        this.currentPosition = Math.min(this.currentPosition, this.targetPosition);
+      }
+
+      this.windowCoveringService.getCharacteristic(Characteristic.CurrentPosition).updateValue(this.currentPosition);
+
+      // if the new current position is the target one, we have to stop
+      if (this.currentPosition === this.targetPosition) {
+        this.log.debug(`setInterval stop ${this.currentPosition} ${this.targetPosition}`);
+        this.currentPosition = this.targetPosition;
+        this.positionState = Characteristic.PositionState.STOPPED;
+        this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.STOPPED);
+
+        // don't emit stop command if the shutter goes full up or down to be sure it's completely open or close, the shutter engine will auto stop
+        if (this.currentPosition !== 0 && this.currentPosition !== 100) {
+          this.emitter.sendCommand('My');
         }
+        // XXX stop interval
       }
     }, interval);
+
+    // your accessory must have an AccessoryInformation service
+    this.informationService = new Service.AccessoryInformation()
+      .setCharacteristic(Characteristic.Manufacturer, 'acemtp')
+      .setCharacteristic(Characteristic.SerialNumber, '1975-06-20-42')
+      .setCharacteristic(Characteristic.Model, 'SomfyRtsRollerShutter');
 
     this.windowCoveringService = new Service.WindowCovering(this.config.name);
 
@@ -158,7 +159,6 @@ class SomfyRtsRollerShutterAccessory {
    * @method setTargetPosition
    * @param {Object} value - The value for the characteristic
    * @param {Function} callback - A callback function from Homebridge
-   * @param {String} button - 'Up', 'Down', 'My', 'Prog'
    */
   setTargetPosition(value, callback) {
     this.log.info(`Function setTargetPosition called with value ${value}`);
@@ -217,7 +217,7 @@ class SomfyRtsRollerShutterAccessory {
    */
   getServices() {
     this.log.info(`Function getServices called`);
-    return [this.windowCoveringService];
+    return [this.informationService, this.windowCoveringService];
   }
 }
 
