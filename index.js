@@ -1,10 +1,7 @@
 const fs = require('fs');
 const RpiGpioRts = require('./RpiGpioRts');
 
-let Service;
-let Characteristic;
-
-// XXX prog button
+// TODO prog button
 
 /**
  * Class simulating a Somfy RTS Remote Accessory for Homebridge
@@ -19,74 +16,58 @@ class SomfyRtsRollerShutterAccessory {
    * @constructor
    * @param {Object} log - The Homebridge log
    * @param {Object} config - The Homebridge config data filtered for this item
+   * @param {Object} api - The Homebridge api
    */
-  constructor(log, config) {
-    this.log = log;
+  constructor(log, config, api) {
     if (!config || !config.name || !config.id || !config.shuttingDownDuration || !config.shuttingUpDuration || !config.shuttingLockingDuration) {
       throw new Error(`Invalid or missing configuration.`);
     }
+    this.log = log;
+    this.api = api;
     this.config = config;
     this.emitter = new RpiGpioRts(log, config);
 
+    this.Service = this.api.hap.Service;
+    this.Characteristic = this.api.hap.Characteristic;
+
     this.loadValues();
 
-    const interval = 100;
+    this.startInterval();
 
-    setInterval(() => {
-      if (this.currentPosition === this.targetPosition) return;
+    this.informationService = new this.Service.AccessoryInformation()
+      .setCharacteristic(this.Characteristic.Manufacturer, 'acemtp')
+      .setCharacteristic(this.Characteristic.SerialNumber, '1975-06-20-42')
+      .setCharacteristic(this.Characteristic.Model, 'SomfyRtsRollerShutter');
 
-      // compute the new currentPosition depending of the direction
-      if (this.currentPosition > this.targetPosition) {
-        this.log.debug(`setInterval dec ${this.currentPosition} ${this.targetPosition}`);
-
-        this.currentPosition -= this.currentPosition <= 1 ? interval * 1 / config.shuttingLockingDuration : interval * 100 / config.shuttingDownDuration;
-        this.currentPosition = Math.max(this.currentPosition, this.targetPosition);
-      } else if (this.currentPosition < this.targetPosition) {
-        this.log.debug(`setInterval inc ${this.currentPosition} ${this.targetPosition}`);
-
-        this.currentPosition += this.currentPosition <= 1 ? interval * 1 / config.shuttingLockingDuration : interval * 100 / config.shuttingUpDuration;
-        this.currentPosition = Math.min(this.currentPosition, this.targetPosition);
-      }
-
-      this.windowCoveringService.getCharacteristic(Characteristic.CurrentPosition).updateValue(this.currentPosition);
-
-      // if the new current position is the target one, we have to stop
-      if (this.currentPosition === this.targetPosition) {
-        this.log.debug(`setInterval stop ${this.currentPosition} ${this.targetPosition}`);
-        this.currentPosition = this.targetPosition;
-        this.positionState = Characteristic.PositionState.STOPPED;
-        this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.STOPPED);
-
-        // don't emit stop command if the shutter goes full up or down to be sure it's completely open or close, the shutter engine will auto stop
-        if (this.currentPosition !== 0 && this.currentPosition !== 100) {
-          this.emitter.sendCommand('My');
-        }
-        // XXX stop interval
-      }
-    }, interval);
-
-    // your accessory must have an AccessoryInformation service
-    this.informationService = new Service.AccessoryInformation()
-      .setCharacteristic(Characteristic.Manufacturer, 'acemtp')
-      .setCharacteristic(Characteristic.SerialNumber, '1975-06-20-42')
-      .setCharacteristic(Characteristic.Model, 'SomfyRtsRollerShutter');
-
-    this.windowCoveringService = new Service.WindowCovering(this.config.name);
+    this.windowCoveringService = new this.Service.WindowCovering(this.config.name);
 
     this.windowCoveringService
-      .getCharacteristic(Characteristic.CurrentPosition)
-      .on('get', this.getCurrentPosition.bind(this));
+      .getCharacteristic(this.Characteristic.CurrentPosition)
+      .onGet(() => this.currentPosition);
 
     this.windowCoveringService
-      .getCharacteristic(Characteristic.PositionState)
-      .on('get', this.getPositionState.bind(this));
+      .getCharacteristic(this.Characteristic.PositionState)
+      .onGet(() => this.positionState);
 
     this.windowCoveringService
-      .getCharacteristic(Characteristic.TargetPosition)
-      .on('get', this.getTargetPosition.bind(this))
-      .on('set', this.setTargetPosition.bind(this));
+      .getCharacteristic(this.Characteristic.TargetPosition)
+      .onGet(() => this.targetPosition)
+      .onSet(this.setTargetPosition.bind(this));
 
-    this.log.info(`Initialized accessory`);
+    if (this.config.prog) {
+      this.progService = new this.Service.Switch(`${this.config.name} Prog`);
+
+      this.progService.getCharacteristic(this.Characteristic.On)
+        .onGet(() => { this.log.debug(`Function getProg called`); return false; })
+        .onSet(value => {
+          this.log.debug(`Function setProg called with value ${value}`);
+          if (value === true) {
+            this.emitter.sendCommand('Prog');
+            setTimeout(() => { this.progService.setCharacteristic(this.Characteristic.On, false); }, 500);
+          }
+        });
+    }
+    this.log.info('Initialized accessory');
   }
 
   // Get the latest saved target
@@ -97,18 +78,18 @@ class SomfyRtsRollerShutterAccessory {
       const values = JSON.parse(json);
 
       this.targetPosition = values.targetPosition; // 100 = open  0 = close
-      this.log.info(`Retrieved targetPosition ${this.targetPosition} from file ./${id}.json`);
+      this.log.debug(`Retrieved targetPosition ${this.targetPosition} from file ./${id}.json`);
     } catch (err) {
       if (err.code === 'ENOENT') {
         this.targetPosition = 100; // 100 = open  0 = close
-        this.log.info(`No file ./${id}.json, set targetPosition to 100`);
+        this.log.debug(`No file ./${id}.json, set targetPosition to 100`);
         this.saveValues();
       } else {
         throw err;
       }
     }
     this.currentPosition = this.targetPosition;
-    this.positionState = Characteristic.PositionState.STOPPED;
+    this.positionState = this.Characteristic.PositionState.STOPPED;
   }
 
   saveValues() {
@@ -117,95 +98,65 @@ class SomfyRtsRollerShutterAccessory {
       targetPosition: this.targetPosition,
     };
     fs.writeFile(`./${id}.json`, JSON.stringify(values), err => { if (err) throw err; });
-    this.log.info(`Saved targetPosition ${this.targetPosition} in file ./${id}.json`);
+    this.log.debug(`Saved targetPosition ${this.targetPosition} in file ./${id}.json`);
   }
 
-  /**
-   * Getter for the 'getCurrentPosition' characteristic of the 'WindowCovering' service
-   *
-   * @method getCurrentPosition
-   * @param {Function} callback - A callback function from Homebridge
-   */
-  getCurrentPosition(callback) {
-    this.log.info(`Function getCurrentPosition called and return ${this.currentPosition}`);
-    callback(null, this.currentPosition);
+  startInterval() {
+    const interval = 100;
+
+    setInterval(() => {
+      if (this.currentPosition === this.targetPosition) return;
+
+      // compute the new currentPosition depending of the direction
+      if (this.currentPosition > this.targetPosition) {
+        this.log.debug(`setInterval dec ${this.currentPosition} ${this.targetPosition}`);
+
+        this.currentPosition -= this.currentPosition <= 1 ? interval * 1 / this.config.shuttingLockingDuration : interval * 100 / this.config.shuttingDownDuration;
+        this.currentPosition = Math.max(this.currentPosition, this.targetPosition);
+      } else if (this.currentPosition < this.targetPosition) {
+        this.log.debug(`setInterval inc ${this.currentPosition} ${this.targetPosition}`);
+
+        this.currentPosition += this.currentPosition <= 1 ? interval * 1 / this.config.shuttingLockingDuration : interval * 100 / this.config.shuttingUpDuration;
+        this.currentPosition = Math.min(this.currentPosition, this.targetPosition);
+      }
+
+      this.windowCoveringService.getCharacteristic(this.Characteristic.CurrentPosition).updateValue(this.currentPosition);
+
+      // if the new current position is the target one, we have to stop
+      if (this.currentPosition === this.targetPosition) {
+        this.log.debug(`setInterval stop ${this.currentPosition} ${this.targetPosition}`);
+        this.currentPosition = this.targetPosition;
+        this.positionState = this.Characteristic.PositionState.STOPPED;
+        this.windowCoveringService.getCharacteristic(this.Characteristic.PositionState).updateValue(this.Characteristic.PositionState.STOPPED);
+
+        // don't emit stop command if the shutter goes full up or down to be sure it's completely open or close, the shutter engine will auto stop
+        if (this.currentPosition !== 0 && this.currentPosition !== 100) {
+          this.emitter.sendCommand('My');
+        }
+        // XXX stop interval
+      }
+    }, interval);
   }
 
-  /**
-   * Getter for the 'getPositionState' characteristic of the 'WindowCovering' service
-   *
-   * @method getPositionState
-   * @param {Function} callback - A callback function from Homebridge
-   */
-  getPositionState(callback) {
-    this.log.info(`Function getPositionState called and return ${this.positionState}`);
-    callback(null, this.positionState);
-  }
-
-  /**
-   * Getter for the 'getTargetPosition' characteristic of the 'WindowCovering' service
-   *
-   * @method getTargetPosition
-   * @param {Function} callback - A callback function from Homebridge
-   */
-  getTargetPosition(callback) {
-    this.log.info(`Function getTargetPosition called and return ${this.targetPosition}`);
-    callback(null, this.targetPosition);
-  }
-
-  /**
-   * Setter for the 'setTargetPosition' characteristic of the 'WindowCovering' service
-   *
-   * @method setTargetPosition
-   * @param {Object} value - The value for the characteristic
-   * @param {Function} callback - A callback function from Homebridge
-   */
-  setTargetPosition(value, callback) {
-    this.log.info(`Function setTargetPosition called with value ${value}`);
+  setTargetPosition(value) {
+    this.log.debug(`Function setTargetPosition called with value ${value}`);
     this.targetPosition = value;
     this.saveValues();
 
-    if (this.positionState === Characteristic.PositionState.STOPPED) {
-      if (this.currentPosition > this.targetPosition) {
-        // need to start a dec on the shutter
-        this.log.info(`Function setTargetPosition start dec ${this.currentPosition} ${this.targetPosition}`);
-        this.positionState = Characteristic.PositionState.DECREASING;
-        this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.DECREASING);
-        this.emitter.sendCommand('Down');
-        // XXX start interval
-      } else if (this.currentPosition < this.targetPosition) {
-        // need to start a inc on the shutter
-        this.log.info(`Function setTargetPosition start inc ${this.currentPosition} ${this.targetPosition}`);
-        this.positionState = Characteristic.PositionState.INCREASING;
-        this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.INCREASING);
-        this.emitter.sendCommand('Up');
-        // XXX start interval
-      }
-    } else if (this.positionState === Characteristic.PositionState.DECREASING) {
-      if (this.currentPosition > this.targetPosition) {
-        // need to continue a dec on the shutter
-        this.log.info(`Function setTargetPosition continue dec ${this.currentPosition} ${this.targetPosition}`);
-      } else if (this.currentPosition < this.targetPosition) {
-        // need to start a inc on the shutter
-        this.log.info(`Function setTargetPosition switch start inc ${this.currentPosition} ${this.targetPosition}`);
-        this.positionState = Characteristic.PositionState.INCREASING;
-        this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.INCREASING);
-        this.emitter.sendCommand('Up');
-      }
-    } else if (this.positionState === Characteristic.PositionState.INCREASING) {
-      if (this.currentPosition > this.targetPosition) {
-        // need to start a inc on the shutter
-        this.log.info(`Function setTargetPosition switch start dec ${this.currentPosition} ${this.targetPosition}`);
-        this.positionState = Characteristic.PositionState.DECREASING;
-        this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.DECREASING);
-        this.emitter.sendCommand('Down');
-      } else if (this.currentPosition < this.targetPosition) {
-        // need to continue a inc on the shutter
-        this.log.info(`Function setTargetPosition continue inc ${this.currentPosition} ${this.targetPosition}`);
-      }
+    let newPositionState;
+    if ((this.positionState === this.Characteristic.PositionState.INCREASING || this.positionState === this.Characteristic.PositionState.STOPPED) && this.currentPosition > this.targetPosition) {
+      newPositionState = this.Characteristic.PositionState.DECREASING;
+    } else if ((this.positionState === this.Characteristic.PositionState.DECREASING || this.positionState === this.Characteristic.PositionState.STOPPED) && this.currentPosition < this.targetPosition) {
+      newPositionState = this.Characteristic.PositionState.INCREASING;
     }
 
-    callback(null);
+    if (newPositionState === undefined) return;
+
+    this.log.debug(`Function setTargetPosition start ${newPositionState} ${this.currentPosition} ${this.targetPosition}`);
+
+    this.positionState = newPositionState;
+    this.windowCoveringService.getCharacteristic(this.Characteristic.PositionState).updateValue(newPositionState);
+    this.emitter.sendCommand(newPositionState === this.Characteristic.PositionState.INCREASING ? 'Up' : 'Down');
   }
 
   /**
@@ -216,13 +167,13 @@ class SomfyRtsRollerShutterAccessory {
    * @return {Array} - An array containing the services
    */
   getServices() {
-    this.log.info(`Function getServices called`);
-    return [this.informationService, this.windowCoveringService];
+    this.log.debug(`Function getServices called`);
+    const services = [this.informationService, this.windowCoveringService];
+    if (this.progService) services.push(this.progService);
+    return services;
   }
 }
 
-module.exports = homebridge => {
-  Service = homebridge.hap.Service;
-  Characteristic = homebridge.hap.Characteristic;
-  homebridge.registerAccessory('homebridge-rpi-somfy-roller-shutter', 'Somfy RTS Roller Shutter', SomfyRtsRollerShutterAccessory);
+module.exports = api => {
+  api.registerAccessory('homebridge-rpi-somfy-roller-shutter', 'Somfy RTS Roller Shutter', SomfyRtsRollerShutterAccessory);
 };
