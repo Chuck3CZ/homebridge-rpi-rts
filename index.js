@@ -1,3 +1,4 @@
+const fs = require('fs');
 const RpiGpioRts = require('./RpiGpioRts');
 
 // TODO: gérer le cas où on referme/reouvre completement apres une fermeture ouverture (dans le cas ou ca a mal fermé un volet)
@@ -27,9 +28,7 @@ class SomfyRtsRollerShutterAccessory {
     this.config = config;
     this.emitter = new RpiGpioRts(log, config);
 
-    this.currentPosition = 100; // TODO need to be saved
-    this.positionState = Characteristic.PositionState.STOPPED;
-    this.targetPosition = 100; // 100 = open  0 = close
+    this.loadValues();
 
     const interval = 100;
 
@@ -47,7 +46,6 @@ class SomfyRtsRollerShutterAccessory {
           this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.STOPPED);
           if (this.currentPosition !== 0 && this.currentPosition !== 100) {
             // don't stop if the shutter go full up or down to be sure it's completely open or close, the shutter will auto stop
-            this.log.info('XXXXXXXXXX impulse STOP');
             this.emitter.sendCommand('My');
           }
           // XXX stop interval
@@ -65,7 +63,6 @@ class SomfyRtsRollerShutterAccessory {
           this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.STOPPED);
           if (this.currentPosition !== 0 && this.currentPosition !== 100) {
             // don't stop if the shutter go full up or down to be sure it's completely open or close, the shutter will auto stop
-            this.log.info('XXXXXXXXXX impulse STOP');
             this.emitter.sendCommand('My');
           }
           // XXX stop interval
@@ -89,6 +86,37 @@ class SomfyRtsRollerShutterAccessory {
       .on('set', this.setTargetPosition.bind(this));
 
     this.log.info(`Initialized accessory`);
+  }
+
+  // Get the latest saved target
+  loadValues() {
+    const id = parseInt(this.config.id, 10);
+    try {
+      const json = fs.readFileSync(`./${id}.json`);
+      const values = JSON.parse(json);
+
+      this.targetPosition = values.targetPosition; // 100 = open  0 = close
+      this.log.info(`Retrieved targetPosition ${this.targetPosition} from file ./${id}.json`);
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        this.targetPosition = 100; // 100 = open  0 = close
+        this.log.info(`No file ./${id}.json, set targetPosition to 100`);
+        this.saveValues();
+      } else {
+        throw err;
+      }
+    }
+    this.currentPosition = this.targetPosition;
+    this.positionState = Characteristic.PositionState.STOPPED;
+  }
+
+  saveValues() {
+    const id = parseInt(this.config.id, 10);
+    const values = {
+      targetPosition: this.targetPosition,
+    };
+    fs.writeFile(`./${id}.json`, JSON.stringify(values), err => { if (err) throw err; });
+    this.log.info(`Saved targetPosition ${this.targetPosition} in file ./${id}.json`);
   }
 
   /**
@@ -135,6 +163,7 @@ class SomfyRtsRollerShutterAccessory {
   setTargetPosition(value, callback) {
     this.log.info(`Function setTargetPosition called with value ${value}`);
     this.targetPosition = value;
+    this.saveValues();
 
     if (this.positionState === Characteristic.PositionState.STOPPED) {
       if (this.currentPosition > this.targetPosition) {
@@ -142,7 +171,6 @@ class SomfyRtsRollerShutterAccessory {
         this.log.info(`Function setTargetPosition start dec ${this.currentPosition} ${this.targetPosition}`);
         this.positionState = Characteristic.PositionState.DECREASING;
         this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.DECREASING);
-        this.log.info('XXXXXXXXXX impulse DOWN');
         this.emitter.sendCommand('Down');
         // XXX start interval
       } else if (this.currentPosition < this.targetPosition) {
@@ -150,7 +178,6 @@ class SomfyRtsRollerShutterAccessory {
         this.log.info(`Function setTargetPosition start inc ${this.currentPosition} ${this.targetPosition}`);
         this.positionState = Characteristic.PositionState.INCREASING;
         this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.INCREASING);
-        this.log.info('XXXXXXXXXX impulse UP');
         this.emitter.sendCommand('Up');
         // XXX start interval
       }
@@ -163,7 +190,6 @@ class SomfyRtsRollerShutterAccessory {
         this.log.info(`Function setTargetPosition switch start inc ${this.currentPosition} ${this.targetPosition}`);
         this.positionState = Characteristic.PositionState.INCREASING;
         this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.INCREASING);
-        this.log.info('XXXXXXXXXX impulse UP');
         this.emitter.sendCommand('Up');
       }
     } else if (this.positionState === Characteristic.PositionState.INCREASING) {
@@ -172,7 +198,6 @@ class SomfyRtsRollerShutterAccessory {
         this.log.info(`Function setTargetPosition switch start dec ${this.currentPosition} ${this.targetPosition}`);
         this.positionState = Characteristic.PositionState.DECREASING;
         this.windowCoveringService.getCharacteristic(Characteristic.PositionState).updateValue(Characteristic.PositionState.DECREASING);
-        this.log.info('XXXXXXXXXX impulse DOWN');
         this.emitter.sendCommand('Down');
       } else if (this.currentPosition < this.targetPosition) {
         // need to continue a inc on the shutter
