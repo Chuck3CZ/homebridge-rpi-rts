@@ -139,7 +139,7 @@ When a device receives a signal it does the following:
 
 A same remote can even be registered on many devices (intentionally or inadvertently), and thus control simultaneoulsy many devices.
 
-<h3 id="ConfigOfPlugin"> Configuration of the Plugin </h3> 
+## Configuration of the Plugin
 Go to Homebridge Config UI X, go to the Plugins tab, and click on Settings under Homebridge Rpi Rts.
 
 Create as many accessories as needed (e.g. one per device to control). Each accessory is equivalent to a virtual remote. Each accessory must get a unique ID.
@@ -206,7 +206,7 @@ Rolling codes are stored in text files in the Homebridge storage path with the u
 
 - Error `Can't lock /var/run/pigpio.pid`: stop current pigpio daemon instance: `sudo killall pigpiod`.
 
-- Error `Unhandled signal 15`: Check <a href="#config.json" id="ConfigOfPlugin"> Configuration of the Plugin</a> //https://github.com/borekb/example/issues/123#user-content-second-section
+- Error `Unhandled signal 15`: Check <a href="#-configuration-of-the-plugin-" id="ConfigOfPlugin"> Configuration of the Plugin</a> 
 
 
 If it does not solve the problem, please open an issue in GitHub with as much information on the environment and error as possible (Raspberry Pi model, Node.js version, Homebridge version, ...)
