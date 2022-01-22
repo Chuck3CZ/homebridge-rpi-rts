@@ -3,7 +3,7 @@ A [Homebridge](https://github.com/homebridge/homebridge) plugin to add HomeKit c
 
 # Fork changes
 
-Instead of the origin version of the package homebridge-rpi-rts, this package handle a rolling shutters as a WindowCovering so it has only one button for each shutter instead of 3 (Up, Down, My).
+Instead of the origin version of the package homebridge-rpi-rts, this package handle a **rolling shutters as a WindowCovering** so it has only one button for each shutter instead of 3 (Up, Down, My).
 
 !!! Be warned that the state will not be good if you mix the command from home kit and with the Somfy remote as explained [here](https://github.com/wibberryd/homebridge-rpi-rts/issues/7#issuecomment-766090063).
 
@@ -48,7 +48,9 @@ To install the plugin, go to Homebridge Config UI X (the visual interface of Hom
 
 Alternatively, use the following command line in a terminal window:
 ```
-sudo npm install -g homebridge-rpi-rts
+sudo npm install github:acemtp/homebridge-rpi-rts 
+
+("sudo npm install github:acemtp/homebridge-rpi-rts --unsafe-perm" if any error appears while instalation )
 ```
 
 ### Modification of Homebridge Service
@@ -137,7 +139,7 @@ When a device receives a signal it does the following:
 
 A same remote can even be registered on many devices (intentionally or inadvertently), and thus control simultaneoulsy many devices.
 
-### Configuration of the Plugin
+<h3 id="ConfigOfPlugin"> Configuration of the Plugin </h3> 
 Go to Homebridge Config UI X, go to the Plugins tab, and click on Settings under Homebridge Rpi Rts.
 
 Create as many accessories as needed (e.g. one per device to control). Each accessory is equivalent to a virtual remote. Each accessory must get a unique ID.
@@ -145,17 +147,25 @@ Create as many accessories as needed (e.g. one per device to control). Each acce
 Alternatively, edit the JSON config file and add the following block inside the accessories array for each accessory to create:
 ```json
 {
+    "accessory": "Somfy RTS Roller Shutter",
     "name": "XXXXXX",
     "id": 12345,
-    "prog": true,
-    "accessory": "Somfy RTS Remote"
+    "shuttingDownDuration": "14000",
+    "shuttingUpDuration": "17000",
+    "shuttingLockingDuration": "3000",
+    "prog": true
 }
 ```
 Where:
-- `name` is the name of the accessory as it will appear in HomeKit (required)
-- `id` is the unique ID of the virtual Somfy RTS remote to choose between 0 and 16777216 (required)
-- `prog` is an option to show (true) or hide (false) the Prog button (optional)
-- `accessory` must be "Somfy RTS Remote" (required)
+- `name`  is the name of the accessory as it will appear in HomeKit  *(required)*
+- `id`  is the unique ID of the virtual Somfy RTS remote to choose between 0 and 16777216  *(required)*
+- `prog`  is an option to show (true) or hide (false) the Prog button  *(optional)*
+- `accessory`  must be "Somfy RTS Roller Shutter"  *(required)*
+- `shuttingDownDuration`  Time in millisecond to go for the shutter to go from top to bottom (just touch the bottom of the window  *(required)*
+- `shuttingUpDuration`  Time in millisecond to go for the shutter to go from bottom (just touch the bottom of the window) to top  *(required)*
+- `shuttingLockingDuration`  Time in millisecond to go for the shutter to go from bottom to completely down  *(required)*
+
+Unwritten *(required)* variables causing the error [Unhandled signal 15]
 
 ### Pairing
 For each virtual remote created:
@@ -195,6 +205,9 @@ Rolling codes are stored in text files in the Homebridge storage path with the u
 - Error `initMboxBlock: init mbox zaps failed`: reboot the Raspberry Pi: `sudo reboot`.
 
 - Error `Can't lock /var/run/pigpio.pid`: stop current pigpio daemon instance: `sudo killall pigpiod`.
+
+- Error `Unhandled signal 15`: Check <a href="#config.json" id="ConfigOfPlugin"> Configuration of the Plugin</a> //https://github.com/borekb/example/issues/123#user-content-second-section
+
 
 If it does not solve the problem, please open an issue in GitHub with as much information on the environment and error as possible (Raspberry Pi model, Node.js version, Homebridge version, ...)
 
