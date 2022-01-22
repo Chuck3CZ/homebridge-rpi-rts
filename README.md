@@ -197,7 +197,7 @@ Rolling codes are stored in text files in the Homebridge storage path with the u
 - Error below: make sure to follow the instructions in Modification of Homebridge Service
 ```
 +---------------------------------------------------------+
-|Sorry, you don't have permission to run this program. |
+|Sorry, you don't have permission to run this program.    |
 |Try running as root, e.g. precede the command with sudo. |
 +---------------------------------------------------------+
 ```
