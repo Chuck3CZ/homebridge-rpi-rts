@@ -165,7 +165,7 @@ Where:
 - `shuttingUpDuration`  Time in millisecond to go for the shutter to go from bottom (just touch the bottom of the window) to top  *(required)*
 - `shuttingLockingDuration`  Time in millisecond to go for the shutter to go from bottom to completely down  *(required)*
 
-Unwritten *(required)* variables causing the error [Unhandled signal 15]
+**Unwritten *(required)* variables causing the error [Unhandled signal 15]**
 
 ### Pairing
 For each virtual remote created:
