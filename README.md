@@ -49,9 +49,12 @@ To install the plugin, go to Homebridge Config UI X (the visual interface of Hom
 Alternatively, use the following command line in a terminal window:
 ```
 sudo npm install github:acemtp/homebridge-rpi-rts 
-
-("sudo npm install github:acemtp/homebridge-rpi-rts --unsafe-perm" if any error appears while instalation )
 ```
+or
+```
+sudo npm install github:acemtp/homebridge-rpi-rts --unsafe-perm
+```
+if any error appears while instalation
 
 ### Modification of Homebridge Service
 Root privileges are required to send waveform signals to the transmitter through the Rapsberry Pi GPIO.
