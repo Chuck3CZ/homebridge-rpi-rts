@@ -161,12 +161,12 @@ Alternatively, edit the JSON config file and add the following block inside the 
 ```
 Where:
 - `name`  is the name of the accessory as it will appear in HomeKit  ***(required)***
-- `id`  is the unique ID of the virtual Somfy RTS remote to choose between 0 and 16777216  ***(required)*
-- `prog`  is an option to show (true) or hide (false) the Prog button  ***(optional)*
-- `accessory`  must be "Somfy RTS Roller Shutter"  ***(required)*
-- `shuttingDownDuration`  Time in millisecond to go for the shutter to go from top to bottom (just touch the bottom of the window  ***(required)*
-- `shuttingUpDuration`  Time in millisecond to go for the shutter to go from bottom (just touch the bottom of the window) to top  ***(required)*
-- `shuttingLockingDuration`  Time in millisecond to go for the shutter to go from bottom to completely down  ***(required)*
+- `id`  is the unique ID of the virtual Somfy RTS remote to choose between 0 and 16777216  ***(required)***
+- `prog`  is an option to show (true) or hide (false) the Prog button  ***(optional)****
+- `accessory`  must be "Somfy RTS Roller Shutter"  ***(required)****
+- `shuttingDownDuration`  Time in millisecond to go for the shutter to go from top to bottom (just touch the bottom of the window  ***(required)****
+- `shuttingUpDuration`  Time in millisecond to go for the shutter to go from bottom (just touch the bottom of the window) to top  ***(required)***
+- `shuttingLockingDuration`  Time in millisecond to go for the shutter to go from bottom to completely down  ***(required)***
 
 *Unwritten **(required)** variables causing the error [Unhandled signal 15]*
 
