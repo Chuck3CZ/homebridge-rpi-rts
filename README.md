@@ -222,7 +222,7 @@ If it does not solve the problem, please open an issue in GitHub with as much in
 - [Nickduino](https://github.com/Nickduino/Pi-Somfy) for a python implementation of the Somfy RTS protocol.
 
 
-# ⚖️ TERMS OF USE 📋
+# 📋 TERMS OF USE ⚖️
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 
