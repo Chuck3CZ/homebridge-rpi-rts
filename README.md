@@ -226,7 +226,7 @@ Rolling codes are stored in text files in the Homebridge storage path with the u
 
 - Error `Can't lock /var/run/pigpio.pid`: stop current pigpio daemon instance: `sudo killall pigpiod`.
 
-- Error `Unhandled signal 15`: Check <a href="#configuration-of-the-plugin-" id="ConfigOfPlugin"> Configuration of the Plugin</a>  
+- Error `Unhandled signal 15`: Check <a href="#-configuration-of-the-plugin-" id="ConfigOfPlugin"> Configuration of the Plugin</a>  
 
 
 If it does not solve the problem, please open an issue in GitHub with as much information on the environment and error as possible (Raspberry Pi model, Node.js version, Homebridge version, ...)
