@@ -1,0 +1,33 @@
+{
+    "bridge": {
+        "name": "Homebridge_RPI1",
+        "username": "62:6F:6F:62:69:65",
+        "port": 55535,
+        "pin": "420-69-420"
+    },
+    "accessories": [
+        {
+            "accessory": "Somfy RTS Roller Shutter",
+            "name":"Room",
+            "id": 1,
+            "prog": false,
+            "shuttingDownDuration": "17000",
+            "shuttingUpDuration": "14000",
+            "shuttingLockingDuration": "3000"
+            
+        },
+        {
+            "accessory": "Somfy RTS Roller Shutter",
+            "name": "Kitchen",
+            "id": 2,
+            "prog": true,
+            "shuttingDownDuration": "58000",
+            "shuttingUpDuration": "55000",
+            "shuttingLockingDuration": "3000"
+            
+        }
+    ],
+    "disabledPlugins": [
+        "homebridge-rpi-rts"
+    ]
+}

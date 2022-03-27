@@ -1,0 +1,40 @@
+{
+  "name": "homebridge-rpi-somfy-roller-shutter",
+  "description": "A Homebridge plugin to add HomeKit compatibility to Somfy RTS rolling shutters requiring only a Raspberry Pi and a simple 433 MHz transmitter.",
+  "version": "2.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/acemtp/homebridge-rpi-rts.git"
+  },
+  "keywords": [
+    "homebridge-plugin",
+    "raspberry",
+    "pi",
+    "somfy",
+    "rts",
+    "shutter",
+    "homekit"
+  ],
+  "author": "wibberryd and acemtp",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/acemtp/homebridge-rpi-rts/issues"
+  },
+  "homepage": "https://github.com/acemtp/homebridge-rpi-rts",
+  "engines": {
+    "homebridge": ">=1.0.0",
+    "node": ">=10.17.0"
+  },
+  "dependencies": {
+    "pigpio": "^3.1.1"
+  },
+  "devDependencies": {
+    "eslint": "^7.32.0",
+    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-plugin-import": "^2.24.2"
+  }
+}
